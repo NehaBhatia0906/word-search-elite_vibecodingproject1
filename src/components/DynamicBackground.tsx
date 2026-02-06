@@ -53,14 +53,14 @@ export function DynamicBackground({
         }}
       />
       
-      {/* Overlay for readability - more transparent */}
+      {/* Overlay for readability - extra transparent */}
       <div 
         className={cn(
           "fixed inset-0 transition-opacity duration-700",
           currentImage && isLoaded ? "opacity-100" : "opacity-0"
         )}
         style={{
-          background: 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.4) 0%, hsla(0, 0%, 100%, 0.25) 50%, hsla(0, 0%, 100%, 0.4) 100%)'
+          background: 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.22) 0%, hsla(0, 0%, 100%, 0.12) 50%, hsla(0, 0%, 100%, 0.22) 100%)'
         }}
       />
 

@@ -160,7 +160,7 @@ export function WordSearchGrid({
   return (
     <div
       ref={gridRef}
-      className="inline-block p-5 sm:p-6 rounded-2xl glass-strong shadow-soft-lg select-none touch-none animate-scale-in"
+      className="inline-block p-5 sm:p-6 rounded-2xl glass shadow-soft-lg select-none touch-none animate-scale-in"
       onMouseLeave={() => {
         if (selection.isSelecting) {
           setSelection({ cells: [], isSelecting: false });

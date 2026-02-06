@@ -125,21 +125,21 @@
 
   /* Glassmorphism utilities */
   .glass {
-    background: hsl(0 0% 100% / 0.35);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(0 0% 100% / 0.25);
+    background: hsl(0 0% 100% / 0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid hsl(0 0% 100% / 0.18);
   }
 
   .glass-strong {
-    background: hsl(0 0% 100% / 0.55);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid hsl(0 0% 100% / 0.3);
+    background: hsl(0 0% 100% / 0.38);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid hsl(0 0% 100% / 0.22);
   }
 
   .dark .glass-strong {
-    background: hsl(220 18% 16% / 0.6);
+    background: hsl(220 18% 16% / 0.5);
     border: 1px solid hsl(0 0% 100% / 0.1);
   }
 

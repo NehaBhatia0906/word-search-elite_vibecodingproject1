@@ -53,10 +53,10 @@ const Index = () => {
           </header>
 
           {/* Main Content */}
-          <div className="grid lg:grid-cols-[320px_1fr] gap-8">
-            {/* Left Panel - Controls */}
-            <div className="space-y-6">
-              <div className="p-6 rounded-2xl glass-strong shadow-soft animate-fade-in">
+          <div className="flex flex-col lg:grid lg:grid-cols-[320px_1fr] gap-6 lg:gap-8">
+            {/* Left Panel - Controls (order 1 on mobile, stays left on desktop) */}
+            <div className="space-y-6 order-1 lg:order-none">
+              <div className="p-4 sm:p-6 rounded-2xl glass-strong shadow-soft animate-fade-in">
                 <GameControls
                   onGenerate={generateNewPuzzle}
                   onHint={useHint}
@@ -67,29 +67,31 @@ const Index = () => {
                 />
               </div>
 
-              {/* Word List (visible when puzzle exists) */}
+              {/* Word List - hidden on mobile when puzzle exists, shown below grid */}
               {puzzle && (
-                <WordList
-                  words={words}
-                  foundWords={foundWords}
-                  gameMode={gameMode}
-                />
+                <div className="hidden lg:block">
+                  <WordList
+                    words={words}
+                    foundWords={foundWords}
+                    gameMode={gameMode}
+                  />
+                </div>
               )}
             </div>
 
-            {/* Right Panel - Grid */}
-            <div className="flex flex-col items-center justify-start">
+            {/* Right Panel - Grid (order 2 on mobile) */}
+            <div className="flex flex-col items-center justify-start order-2 lg:order-none">
               {puzzle ? (
                 <>
-                  <div className="mb-5 text-center animate-fade-in">
-                    <p className="font-display text-2xl text-foreground capitalize">
+                  <div className="mb-4 sm:mb-5 text-center animate-fade-in">
+                    <p className="font-display text-xl sm:text-2xl text-foreground capitalize">
                       {theme}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Find all {words.length} words
                     </p>
                   </div>
-                  <div className="overflow-x-auto max-w-full">
+                  <div className="overflow-x-auto max-w-full px-2">
                     <WordSearchGrid
                       grid={puzzle.grid}
                       placedWords={puzzle.placedWords}
@@ -100,21 +102,32 @@ const Index = () => {
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center min-h-[400px]">
-                  <div className="text-center p-10 rounded-3xl glass-strong shadow-soft max-w-md animate-fade-in">
-                    <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary/10 flex items-center justify-center">
-                      <Grid3X3 className="w-8 h-8 text-primary" />
+                <div className="flex-1 flex items-center justify-center min-h-[300px] lg:min-h-[400px]">
+                  <div className="text-center p-6 sm:p-10 rounded-3xl glass-strong shadow-soft max-w-md animate-fade-in">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 sm:mb-6 rounded-2xl bg-primary/10 flex items-center justify-center">
+                      <Grid3X3 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                     </div>
-                    <h2 className="font-display text-3xl text-foreground mb-3">
+                    <h2 className="font-display text-2xl sm:text-3xl text-foreground mb-2 sm:mb-3">
                       Ready to Play?
                     </h2>
-                    <p className="text-muted-foreground">
+                    <p className="text-sm sm:text-base text-muted-foreground">
                       Enter a theme to generate your personalized word search puzzle with a matching background
                     </p>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Word List - shown below grid on mobile only */}
+            {puzzle && (
+              <div className="block lg:hidden order-3">
+                <WordList
+                  words={words}
+                  foundWords={foundWords}
+                  gameMode={gameMode}
+                />
+              </div>
+            )}
           </div>
 
           {/* Footer */}

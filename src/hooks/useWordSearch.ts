@@ -3,6 +3,35 @@ import { supabase } from '@/integrations/supabase/client';
 import { generatePuzzle, GeneratedPuzzle, Difficulty, PlacedWord } from '@/lib/wordSearchGenerator';
 import { toast } from 'sonner';
 
+interface CachedTheme {
+  words: string[];
+  background: BackgroundImage | null;
+  timestamp: number;
+}
+
+const CACHE_KEY_PREFIX = 'ws_theme_';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCachedTheme(theme: string): CachedTheme | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim());
+    if (!raw) return null;
+    const cached: CachedTheme = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > CACHE_TTL) {
+      localStorage.removeItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim());
+      return null;
+    }
+    return cached;
+  } catch { return null; }
+}
+
+function setCachedTheme(theme: string, words: string[], background: BackgroundImage | null) {
+  try {
+    const data: CachedTheme = { words, background, timestamp: Date.now() };
+    localStorage.setItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim(), JSON.stringify(data));
+  } catch { /* quota exceeded, ignore */ }
+}
+
 interface BackgroundImage {
   url: string;
   photographer?: string;
@@ -70,28 +99,43 @@ export function useWordSearch() {
       setState((prev) => ({ ...prev, isLoading: true, isVictory: false, hintCells: new Set() }));
 
       try {
-        // Fetch background and words in parallel
-        const [backgroundResult, wordsResult] = await Promise.all([
-          fetchBackgroundImage(theme),
-          supabase.functions.invoke('generate-words', {
-            body: { theme },
-          }),
-        ]);
+        // Check localStorage cache first
+        const cached = getCachedTheme(theme);
+        let words: string[];
+        let backgroundResult: BackgroundImage | null;
 
-        const { data, error } = wordsResult;
+        if (cached) {
+          words = cached.words;
+          backgroundResult = cached.background;
+          console.log('Using cached theme data for:', theme);
+        } else {
+          // Fetch background and words in parallel
+          const [bgResult, wordsResult] = await Promise.all([
+            fetchBackgroundImage(theme),
+            supabase.functions.invoke('generate-words', {
+              body: { theme },
+            }),
+          ]);
 
-        if (error) {
-          console.error('Edge function error:', error);
-          throw new Error(error.message || 'Failed to generate words');
-        }
+          backgroundResult = bgResult;
+          const { data, error } = wordsResult;
 
-        if (data?.error) {
-          throw new Error(data.error);
-        }
+          if (error) {
+            console.error('Edge function error:', error);
+            throw new Error(error.message || 'Failed to generate words');
+          }
 
-        const words: string[] = data?.words;
-        if (!words || words.length < 5) {
-          throw new Error('Not enough words generated');
+          if (data?.error) {
+            throw new Error(data.error);
+          }
+
+          words = data?.words;
+          if (!words || words.length < 5) {
+            throw new Error('Not enough words generated');
+          }
+
+          // Cache for future use
+          setCachedTheme(theme, words, backgroundResult);
         }
 
         // Generate the puzzle grid

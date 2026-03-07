@@ -126,15 +126,15 @@
   /* Glassmorphism utilities */
   .glass {
     background: hsl(0 0% 100% / 0.22);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid hsl(0 0% 100% / 0.18);
   }
 
   .glass-strong {
     background: hsl(0 0% 100% / 0.38);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid hsl(0 0% 100% / 0.22);
   }
 

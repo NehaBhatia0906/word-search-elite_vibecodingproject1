@@ -29,9 +29,14 @@ serve(async (req) => {
       );
     }
 
+    // Build a more aesthetic search query
+    const searchQuery = theme.toLowerCase().includes('bollywood')
+      ? 'Bollywood movie cinematography'
+      : `${theme} aesthetic cinematic`;
+
     // Search for a relevant high-quality image
     const searchParams = new URLSearchParams({
-      query: theme,
+      query: searchQuery,
       orientation: 'landscape',
       per_page: '10',
       order_by: 'relevant',

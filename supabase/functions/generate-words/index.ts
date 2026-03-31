@@ -8,7 +8,7 @@ const corsHeaders = {
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 20;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_WINDOW_MS = 60 * 60 * 1000;
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
@@ -21,13 +21,18 @@ function isRateLimited(ip: string): boolean {
   return entry.count > RATE_LIMIT;
 }
 
+const WORD_COUNTS: Record<string, number> = {
+  easy: 10,
+  medium: 20,
+  hard: 30,
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Rate limiting by IP
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     if (isRateLimited(ip)) {
       return new Response(
@@ -36,8 +41,8 @@ serve(async (req) => {
       );
     }
 
-    const { theme } = await req.json();
-    
+    const { theme, difficulty } = await req.json();
+
     if (!theme || typeof theme !== 'string') {
       return new Response(
         JSON.stringify({ error: "Theme is required" }),
@@ -45,7 +50,6 @@ serve(async (req) => {
       );
     }
 
-    // Input validation: length and character sanitization
     const sanitizedTheme = theme.trim().replace(/[^a-zA-Z0-9\s',.-]/g, '').slice(0, 100);
     if (sanitizedTheme.length < 1) {
       return new Response(
@@ -53,6 +57,9 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const validDifficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'easy';
+    const wordCount = WORD_COUNTS[validDifficulty];
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -63,17 +70,20 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a word generator for a word search puzzle game. Generate exactly 15 unique words related to the given theme. 
+    const systemPrompt = `You are a word generator for a word search puzzle game. Generate exactly ${wordCount} unique words related to the given theme.
 
-Rules:
-- Each word must be between 3 and 10 characters
-- Words must be single words (no spaces or hyphens)
+STRICT RULES:
+- Each word must be a COMPLETE, REAL, STANDALONE English word (no abbreviations, no partial words, no made-up words)
+- Each word must be between 3 and 10 characters long
+- Words must be single words only (no spaces, no hyphens, no compound phrases)
 - Words must be appropriate for all ages
-- Words should be commonly known and related to the theme
-- Return ONLY a JSON array of 15 strings, nothing else
+- Words should be commonly known and clearly related to the theme
+- Do NOT truncate or abbreviate words. For example, use "ROMANCE" not "ROMANC", use "DANCE" not "DANC"
+- If a word related to the theme is longer than 10 characters, skip it entirely and choose a different word
+- Return ONLY a JSON array of ${wordCount} uppercase strings, nothing else
 
-Example output format:
-["DINOSAUR","FOSSIL","RAPTOR","TREX","BONE","EXTINCT","JURASSIC","VOLCANO","METEOR","ANCIENT","REPTILE","SCALES","TEETH","CLAW","TAIL"]`;
+Example output format for 10 words:
+["DINOSAUR","FOSSIL","RAPTOR","BONE","EXTINCT","VOLCANO","METEOR","ANCIENT","REPTILE","SCALES"]`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -85,7 +95,7 @@ Example output format:
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate 15 words for the theme: "${sanitizedTheme}"` },
+          { role: "user", content: `Generate exactly ${wordCount} complete, real words for the theme: "${sanitizedTheme}"` },
         ],
       }),
     });
@@ -122,7 +132,6 @@ Example output format:
       );
     }
 
-    // Parse the JSON array from the response
     let words: string[];
     try {
       const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -144,7 +153,7 @@ Example output format:
       .filter((w): w is string => typeof w === 'string')
       .map(w => w.toUpperCase().replace(/[^A-Z]/g, ''))
       .filter(w => w.length >= 3 && w.length <= 10)
-      .slice(0, 15);
+      .slice(0, wordCount);
 
     if (validWords.length < 5) {
       return new Response(

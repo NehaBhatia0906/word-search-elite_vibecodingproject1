@@ -3,15 +3,11 @@ import { cn } from '@/lib/utils';
 
 interface DynamicBackgroundProps {
   imageUrl: string | null;
-  photographer?: string;
-  photographerUrl?: string;
   children: React.ReactNode;
 }
 
 export function DynamicBackground({ 
   imageUrl, 
-  photographer,
-  photographerUrl,
   children 
 }: DynamicBackgroundProps) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -25,13 +21,17 @@ export function DynamicBackground({
         setCurrentImage(imageUrl);
         setIsLoaded(true);
       };
+      img.onerror = () => {
+        console.error('Failed to load background image');
+        setCurrentImage(null);
+      };
       img.src = imageUrl;
     }
   }, [imageUrl]);
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Background Layer */}
+      {/* Background Image Layer */}
       <div 
         className={cn(
           "fixed inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000",
@@ -39,6 +39,8 @@ export function DynamicBackground({
         )}
         style={{ 
           backgroundImage: currentImage ? `url(${currentImage})` : 'none',
+          filter: 'blur(25px)',
+          transform: 'scale(1.1)', // prevent blur edge artifacts
         }}
       />
       
@@ -53,14 +55,14 @@ export function DynamicBackground({
         }}
       />
       
-      {/* Overlay for readability - extra transparent */}
+      {/* 50% Dark Overlay for text legibility */}
       <div 
         className={cn(
           "fixed inset-0 transition-opacity duration-700",
           currentImage && isLoaded ? "opacity-100" : "opacity-0"
         )}
         style={{
-          background: 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.22) 0%, hsla(0, 0%, 100%, 0.12) 50%, hsla(0, 0%, 100%, 0.22) 100%)'
+          background: 'rgba(0, 0, 0, 0.50)'
         }}
       />
 
@@ -68,28 +70,6 @@ export function DynamicBackground({
       <div className="relative z-10">
         {children}
       </div>
-
-      {/* Photo credit */}
-      {photographer && currentImage && isLoaded && (
-        <div className="fixed bottom-4 right-4 z-20">
-          <div className="glass rounded-full px-3 py-1.5 text-xs text-muted-foreground">
-            Photo by{' '}
-            {photographerUrl ? (
-              <a 
-                href={photographerUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="underline hover:text-foreground transition-colors"
-              >
-                {photographer}
-              </a>
-            ) : (
-              photographer
-            )}
-            {' '}on Unsplash
-          </div>
-        </div>
-      )}
     </div>
   );
 }

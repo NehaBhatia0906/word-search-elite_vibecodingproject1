@@ -9,33 +9,37 @@ interface CachedTheme {
   timestamp: number;
 }
 
-const CACHE_KEY_PREFIX = 'ws_theme_';
+const CACHE_KEY_PREFIX = 'ws_cache_';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-function getCachedTheme(theme: string): CachedTheme | null {
+function getCacheKey(theme: string, difficulty: string): string {
+  return CACHE_KEY_PREFIX + theme.toLowerCase().trim() + '_' + difficulty;
+}
+
+function getCachedTheme(theme: string, difficulty: string): CachedTheme | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim());
+    const raw = localStorage.getItem(getCacheKey(theme, difficulty));
     if (!raw) return null;
     const cached: CachedTheme = JSON.parse(raw);
     if (Date.now() - cached.timestamp > CACHE_TTL) {
-      localStorage.removeItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim());
+      localStorage.removeItem(getCacheKey(theme, difficulty));
       return null;
     }
     return cached;
   } catch { return null; }
 }
 
-function setCachedTheme(theme: string, words: string[], background: BackgroundImage | null) {
+function setCachedTheme(theme: string, difficulty: string, words: string[], background: BackgroundImage | null) {
   try {
     const data: CachedTheme = { words, background, timestamp: Date.now() };
-    localStorage.setItem(CACHE_KEY_PREFIX + theme.toLowerCase().trim(), JSON.stringify(data));
+    localStorage.setItem(getCacheKey(theme, difficulty), JSON.stringify(data));
   } catch { /* quota exceeded, ignore */ }
 }
 
 interface BackgroundImage {
   url: string;
-  photographer?: string;
-  photographerUrl?: string;
+  title?: string;
+  source?: string;
 }
 
 interface GameState {
@@ -83,8 +87,8 @@ export function useWordSearch() {
       if (data?.url) {
         return {
           url: data.url,
-          photographer: data.photographer,
-          photographerUrl: data.photographer_url,
+          title: data.title,
+          source: data.source,
         };
       }
       return null;
@@ -99,21 +103,21 @@ export function useWordSearch() {
       setState((prev) => ({ ...prev, isLoading: true, isVictory: false, hintCells: new Set() }));
 
       try {
-        // Check localStorage cache first
-        const cached = getCachedTheme(theme);
+        // Check localStorage cache first (keyed by theme + difficulty)
+        const cached = getCachedTheme(theme, difficulty);
         let words: string[];
         let backgroundResult: BackgroundImage | null;
 
         if (cached) {
           words = cached.words;
           backgroundResult = cached.background;
-          console.log('Using cached theme data for:', theme);
+          console.log('Using cached theme data for:', theme, difficulty);
         } else {
           // Fetch background and words in parallel
           const [bgResult, wordsResult] = await Promise.all([
             fetchBackgroundImage(theme),
             supabase.functions.invoke('generate-words', {
-              body: { theme },
+              body: { theme, difficulty },
             }),
           ]);
 
@@ -135,7 +139,7 @@ export function useWordSearch() {
           }
 
           // Cache for future use
-          setCachedTheme(theme, words, backgroundResult);
+          setCachedTheme(theme, difficulty, words, backgroundResult);
         }
 
         // Generate the puzzle grid
@@ -172,7 +176,6 @@ export function useWordSearch() {
       const newFoundWords = new Set(prev.foundWords);
       newFoundWords.add(word);
 
-      // Remove hint cells for the found word
       const newHintCells = new Set(prev.hintCells);
       const foundPlacedWord = prev.puzzle?.placedWords.find(pw => pw.word === word);
       if (foundPlacedWord) {
@@ -184,9 +187,7 @@ export function useWordSearch() {
       const isVictory = newFoundWords.size === prev.words.length;
 
       if (!isVictory) {
-        toast.success(`Found: ${word}`, {
-          duration: 1500,
-        });
+        toast.success(`Found: ${word}`, { duration: 1500 });
       }
 
       return {
@@ -202,32 +203,22 @@ export function useWordSearch() {
     setState((prev) => {
       if (prev.hintsRemaining <= 0 || !prev.puzzle) return prev;
 
-      // Find an unfound word
       const unfoundWords = prev.puzzle.placedWords.filter(
         (pw) => !prev.foundWords.has(pw.word)
       );
 
       if (unfoundWords.length === 0) return prev;
 
-      // Pick a random unfound word
       const randomWord = unfoundWords[Math.floor(Math.random() * unfoundWords.length)];
-      
-      // Add its cells to hint cells
       const newHintCells = new Set(prev.hintCells);
       randomWord.cells.forEach((cell) => {
         newHintCells.add(`${cell.row}-${cell.col}`);
       });
 
-      toast.info(`Hint: Look for a ${randomWord.word.length}-letter word`, {
-        duration: 3000,
-      });
+      toast.info(`Hint: Look for a ${randomWord.word.length}-letter word`, { duration: 3000 });
 
-      // Clear hint after 3 seconds
       setTimeout(() => {
-        setState((current) => ({
-          ...current,
-          hintCells: new Set(),
-        }));
+        setState((current) => ({ ...current, hintCells: new Set() }));
       }, 3000);
 
       return {

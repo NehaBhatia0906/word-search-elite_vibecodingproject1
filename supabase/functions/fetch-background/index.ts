@@ -8,7 +8,7 @@ const corsHeaders = {
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 30;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_WINDOW_MS = 60 * 60 * 1000;
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
@@ -27,7 +27,6 @@ serve(async (req) => {
   }
 
   try {
-    // Rate limiting by IP
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     if (isRateLimited(ip)) {
       return new Response(
@@ -37,7 +36,7 @@ serve(async (req) => {
     }
 
     const { theme } = await req.json();
-    
+
     if (!theme || typeof theme !== 'string') {
       return new Response(
         JSON.stringify({ error: "Theme is required" }),
@@ -45,7 +44,6 @@ serve(async (req) => {
       );
     }
 
-    // Input validation: length and character sanitization
     const sanitizedTheme = theme.trim().replace(/[^a-zA-Z0-9\s',.-]/g, '').slice(0, 100);
     if (sanitizedTheme.length < 1) {
       return new Response(
@@ -54,39 +52,38 @@ serve(async (req) => {
       );
     }
 
-    const UNSPLASH_ACCESS_KEY = Deno.env.get("UNSPLASH_ACCESS_KEY");
-    if (!UNSPLASH_ACCESS_KEY) {
-      console.error("UNSPLASH_ACCESS_KEY is not configured");
+    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+    const SEARCH_ENGINE_ID = Deno.env.get("SEARCH_ENGINE_ID");
+
+    if (!GOOGLE_API_KEY || !SEARCH_ENGINE_ID) {
+      console.error("Google API credentials not configured");
       return new Response(
-        JSON.stringify({ error: "Unsplash API not configured" }),
+        JSON.stringify({ error: "Image search API not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build a more aesthetic search query
-    const searchQuery = sanitizedTheme.toLowerCase().includes('bollywood')
-      ? 'Bollywood movie cinematography'
-      : `${sanitizedTheme} aesthetic cinematic`;
+    // Build search query with cinematic aesthetic
+    const searchQuery = `${sanitizedTheme} movie cinematography aesthetic`;
 
     const searchParams = new URLSearchParams({
-      query: searchQuery,
-      orientation: 'landscape',
-      per_page: '10',
-      order_by: 'relevant',
+      key: GOOGLE_API_KEY,
+      cx: SEARCH_ENGINE_ID,
+      q: searchQuery,
+      searchType: 'image',
+      imgSize: 'xlarge',
+      imgType: 'photo',
+      num: '10',
+      safe: 'active',
     });
 
     const response = await fetch(
-      `https://api.unsplash.com/search/photos?${searchParams.toString()}`,
-      {
-        headers: {
-          Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
-        },
-      }
+      `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Unsplash API error:", response.status, errorText);
+      console.error("Google Search API error:", response.status, errorText);
       return new Response(
         JSON.stringify({ error: "Failed to fetch background image" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -94,47 +91,23 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    
-    if (!data.results || data.results.length === 0) {
-      const fallbackResponse = await fetch(
-        `https://api.unsplash.com/photos/random?query=nature&orientation=landscape`,
-        {
-          headers: {
-            Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
-          },
-        }
-      );
-      
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json();
-        return new Response(
-          JSON.stringify({
-            url: fallbackData.urls.regular,
-            blur_hash: fallbackData.blur_hash,
-            color: fallbackData.color,
-            photographer: fallbackData.user?.name || 'Unknown',
-            photographer_url: fallbackData.user?.links?.html || '',
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
+
+    if (!data.items || data.items.length === 0) {
       return new Response(
         JSON.stringify({ error: "No images found for this theme" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const randomIndex = Math.floor(Math.random() * Math.min(data.results.length, 5));
-    const image = data.results[randomIndex];
+    // Pick a random image from top results for variety
+    const randomIndex = Math.floor(Math.random() * Math.min(data.items.length, 5));
+    const image = data.items[randomIndex];
 
     return new Response(
       JSON.stringify({
-        url: image.urls.regular,
-        blur_hash: image.blur_hash,
-        color: image.color,
-        photographer: image.user?.name || 'Unknown',
-        photographer_url: image.user?.links?.html || '',
+        url: image.link,
+        title: image.title || '',
+        source: image.displayLink || '',
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

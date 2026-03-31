@@ -5,17 +5,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Rate limiting by IP
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (isRateLimited(ip)) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { theme } = await req.json();
     
     if (!theme || typeof theme !== 'string') {
       return new Response(
         JSON.stringify({ error: "Theme is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Input validation: length and character sanitization
+    const sanitizedTheme = theme.trim().replace(/[^a-zA-Z0-9\s',.-]/g, '').slice(0, 100);
+    if (sanitizedTheme.length < 1) {
+      return new Response(
+        JSON.stringify({ error: "Invalid theme" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -30,11 +64,10 @@ serve(async (req) => {
     }
 
     // Build a more aesthetic search query
-    const searchQuery = theme.toLowerCase().includes('bollywood')
+    const searchQuery = sanitizedTheme.toLowerCase().includes('bollywood')
       ? 'Bollywood movie cinematography'
-      : `${theme} aesthetic cinematic`;
+      : `${sanitizedTheme} aesthetic cinematic`;
 
-    // Search for a relevant high-quality image
     const searchParams = new URLSearchParams({
       query: searchQuery,
       orientation: 'landscape',
@@ -63,7 +96,6 @@ serve(async (req) => {
     const data = await response.json();
     
     if (!data.results || data.results.length === 0) {
-      // Fallback to a random nature image if no results
       const fallbackResponse = await fetch(
         `https://api.unsplash.com/photos/random?query=nature&orientation=landscape`,
         {
@@ -93,7 +125,6 @@ serve(async (req) => {
       );
     }
 
-    // Pick a random image from the top results for variety
     const randomIndex = Math.floor(Math.random() * Math.min(data.results.length, 5));
     const image = data.results[randomIndex];
 
@@ -111,7 +142,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in fetch-background function:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An internal error occurred. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

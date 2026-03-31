@@ -27,8 +27,6 @@ const Index = () => {
   return (
     <DynamicBackground
       imageUrl={backgroundImage?.url || null}
-      photographer={backgroundImage?.photographer}
-      photographerUrl={backgroundImage?.photographerUrl}
     >
       {/* Victory Overlay */}
       {isVictory && (
